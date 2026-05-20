@@ -78,4 +78,6 @@ function appendSystemConstraints(inputBox) {
     editable.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-startRuntimeBridge();
+if (typeof window !== 'undefined') {
+    startRuntimeBridge();
+}
