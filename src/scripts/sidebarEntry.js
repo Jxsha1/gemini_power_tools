@@ -1,6 +1,6 @@
 import { extractUserEmail } from './domScanner.js';
 import { forceLoadHistory } from './historyScanner.js';
-import { saveToCloud, loadFromCloud } from './driveSync.js';
+import { saveToCloud } from './driveSync.js';
 
 let activeEmail = 'default@gmail.com';
 let safeEmailKey = 'default_gmail_com';
@@ -32,7 +32,8 @@ let extensionSettings = {
 
 let isDataLoaded = false;
 let isModifyingDOM = false;
-let globalHarvestedChats = new Map();
+let currentActiveTagColor = '#4a90e2';
+let hasAttemptedHistoryLoad = false;
 
 async function startRuntimeBridge() {
     activeEmail = await extractUserEmail();
@@ -46,12 +47,95 @@ async function startRuntimeBridge() {
         isDataLoaded = true;
         
         setupInteractions();
+        bindTabNavigation();
+        setupLocalStateListeners();
+        initializeSystemHeartbeat();
         console.log('Gemini Workspace Engine safely bridged via Astro.');
     });
 }
 
+function bindTabNavigation() {
+    const tabs = Array.from(document.querySelectorAll('.gpt-tab-btn'));
+    tabs.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const targetBtn = e.target;
+            const innerTabs = Array.from(document.querySelectorAll('.gpt-tab-btn'));
+            innerTabs.forEach(b => b.classList.remove('active'));
+            
+            const innerContents = Array.from(document.querySelectorAll('.gpt-tab-content'));
+            innerContents.forEach(c => c.classList.remove('active'));
+            
+            targetBtn.classList.add('active');
+            const targetContent = document.getElementById(targetBtn.dataset.target);
+            if (targetContent) targetContent.classList.add('active');
+        });
+    });
+}
+
+function setupLocalStateListeners() {
+    const naturalToggle = document.getElementById('gpt-natural-toggle');
+    if (naturalToggle) naturalToggle.checked = extensionSettings.naturalResponsesEnabled;
+
+    const langSelect = document.getElementById('gpt-output-language');
+    if (langSelect) langSelect.value = extensionSettings.outputLanguage || '';
+
+    const syncToggle = document.getElementById('gpt-cloud-sync-toggle');
+    if (syncToggle) syncToggle.checked = extensionSettings.cloudSyncEnabled;
+
+    attachUIControls();
+}
+
+function attachUIControls() {
+    const naturalToggle = document.getElementById('gpt-natural-toggle');
+    if (naturalToggle) {
+        naturalToggle.addEventListener('change', (e) => {
+            const target = e.target;
+            extensionSettings.naturalResponsesEnabled = target.checked;
+            saveSettingsState();
+        });
+    }
+
+    const langSelect = document.getElementById('gpt-output-language');
+    if (langSelect) {
+        langSelect.addEventListener('change', (e) => {
+            const target = e.target;
+            extensionSettings.outputLanguage = target.value;
+            saveSettingsState();
+        });
+    }
+
+    const syncToggle = document.getElementById('gpt-cloud-sync-toggle');
+    if (syncToggle) {
+        syncToggle.addEventListener('change', (e) => {
+            const target = e.target;
+            extensionSettings.cloudSyncEnabled = target.checked;
+            saveSettingsState();
+        });
+    }
+
+    const colorSwatches = Array.from(document.querySelectorAll('.gpt-colour-swatch'));
+    colorSwatches.forEach(swatch => {
+        swatch.addEventListener('click', (e) => {
+            colorSwatches.forEach(s => s.classList.remove('selected'));
+            const target = e.target;
+            target.classList.add('selected');
+            currentActiveTagColor = target.dataset.colour;
+        });
+    });
+}
+
+function saveSettingsState() {
+    if (!isDataLoaded) return;
+    const localSaveObj = {};
+    localSaveObj[STORAGE_KEY] = extensionSettings;
+    chrome.storage.local.set(localSaveObj, () => {
+        if (extensionSettings.cloudSyncEnabled) {
+            saveToCloud({ settings: extensionSettings, backups: [] }, extensionSettings.cloudAccountId, activeEmail);
+        }
+    });
+}
+
 function setupInteractions() {
-    // Intercepts input actions on the native page layout
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             const inputBox = e.target.closest('rich-textarea, text-area, [aria-label*="Message"]');
@@ -76,6 +160,19 @@ function appendSystemConstraints(inputBox) {
     const constraintBlock = `\n\n[Formatting constraints: ${instructions.join(' ')} Plain text only.]`;
     editable.appendChild(document.createTextNode(constraintBlock));
     editable.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function initializeSystemHeartbeat() {
+    setInterval(() => {
+        if (!isDataLoaded || isModifyingDOM) return;
+        const chatLinks = document.querySelectorAll('a[href*="/app/"], a[href*="/chat/"]');
+        if (chatLinks.length > 0 && !hasAttemptedHistoryLoad) {
+            hasAttemptedHistoryLoad = true;
+            forceLoadHistory(() => {
+                console.log('Past history segments aggregated securely.');
+            });
+        }
+    }, 2000);
 }
 
 if (typeof window !== 'undefined') {
