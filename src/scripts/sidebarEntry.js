@@ -36,7 +36,6 @@ let currentActiveTagColor = '#4a90e2';
 let hasAttemptedHistoryLoad = false;
 
 async function injectSidebarDOM() {
-    // Check if the sidebar already exists to prevent duplicate injections
     if (document.getElementById('gpt-right-sidebar')) return true;
 
     try {
@@ -60,7 +59,6 @@ async function injectSidebarDOM() {
 }
 
 async function startRuntimeBridge() {
-    // Core variable assignments must run first to prevent state blocking
     activeEmail = await extractUserEmail();
     safeEmailKey = activeEmail.replace(/[@.]/g, '_');
     STORAGE_KEY = `gpt_workspace_settings_${safeEmailKey}`;
@@ -71,11 +69,9 @@ async function startRuntimeBridge() {
         extensionSettings = { ...extensionSettings, ...localSettings };
         isDataLoaded = true;
         
-        // Initialise core background interactions and page interceptors
         setupInteractions();
         initializeSystemHeartbeat();
         
-        // Attempt DOM injection safely without blocking history processes
         const injected = await injectSidebarDOM();
         if (injected) {
             bindTabNavigation();
@@ -199,7 +195,6 @@ function initializeSystemHeartbeat() {
     setInterval(() => {
         if (!isDataLoaded || isModifyingDOM) return;
         
-        // Ensure UI injection is re-verified periodically if first attempt was too early
         if (!document.getElementById('gpt-right-sidebar')) {
             injectSidebarDOM().then((success) => {
                 if (success) {
@@ -220,5 +215,11 @@ function initializeSystemHeartbeat() {
 }
 
 if (typeof window !== 'undefined') {
-    startRuntimeBridge();
+    setTimeout(() => {
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            startRuntimeBridge();
+        } else {
+            document.addEventListener('DOMContentLoaded', startRuntimeBridge);
+        }
+    }, 1500);
 }
