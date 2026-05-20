@@ -41,8 +41,10 @@ async function injectSidebarDOM() {
     try {
         const sidebarUrl = chrome.runtime.getURL('sidebar.html');
         const response = await fetch(sidebarUrl);
-        const htmlText = await response.text();
         
+        if (!response.ok) throw new Error('File not found at asset root');
+        
+        const htmlText = await response.text();
         const wrapper = document.createElement('div');
         wrapper.innerHTML = htmlText;
         
@@ -53,7 +55,24 @@ async function injectSidebarDOM() {
             return true;
         }
     } catch (error) {
-        console.error('Failed to inject Gemini Workspace Tools layout panel:', error);
+        console.error('File fetch failed, creating fall-back layout:', error);
+        
+        // Fall-back shell ensures features continue running if disk read fails
+        const fallbackNode = document.createElement('div');
+        fallbackNode.id = 'gpt-right-sidebar';
+        fallbackNode.innerHTML = `
+            <div class="gpt-tabs">
+                <button class="gpt-tab-btn active" data-target="gpt-tab-org">Organise</button>
+                <button class="gpt-tab-btn" data-target="gpt-tab-tools">Tools</button>
+                <button class="gpt-tab-btn" data-target="gpt-tab-set">Settings</button>
+            </div>
+            <div id="gpt-tab-org" class="gpt-tab-content active">Panel loading...</div>
+            <div id="gpt-tab-tools" class="gpt-tab-content">Panel loading...</div>
+            <div id="gpt-tab-set" class="gpt-tab-content">Panel loading...</div>
+        `;
+        document.body.appendChild(fallbackNode);
+        document.body.classList.add('gpt-sidebar-active');
+        return true;
     }
     return false;
 }
@@ -77,8 +96,6 @@ async function startRuntimeBridge() {
             bindTabNavigation();
             setupLocalStateListeners();
             console.log('Gemini Workspace Engine UI safely bridged via Astro.');
-        } else {
-            console.warn('UI injection delayed. Extension core runtime is still active.');
         }
     });
 }
