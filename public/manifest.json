@@ -32,7 +32,7 @@
         "assets/sidebar.css"
       ],
       "js": [
-        "sidebar.js"
+        "assets/sidebarEntry.js"
       ],
       "run_at": "document_idle"
     }
