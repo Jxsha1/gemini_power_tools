@@ -20,8 +20,15 @@ import '../styles/global.css';
       <div class="gpt-input-group">
         <input type="text" id="gpt-tag-input" placeholder="e.g. #Research" />
       </div>
+      <div class="gpt-colour-picker-row">
+        <div class="gpt-colour-swatch selected" data-colour="#4a90e2" style="background:#4a90e2;"></div>
+        <div class="gpt-colour-swatch" data-colour="#ef4444" style="background:#ef4444;"></div>
+        <div class="gpt-colour-swatch" data-colour="#f97316" style="background:#f97316;"></div>
+        <div class="gpt-colour-swatch" data-colour="#22c55e" style="background:#22c55e;"></div>
+        <input type="color" id="gpt-custom-colour" class="gpt-custom-colour-picker" value="#4a90e2" aria-label="Select custom RGB colour" />
+      </div>
       <button class="gpt-action-btn secondary" id="gpt-save-tag">Create Tag</button>
-      <div id="gpt-tag-list"></div>
+      <div id="gpt-tag-list" style="margin-top:15px;"></div>
     </SidebarSection>
   </TabContent>
 
@@ -34,6 +41,57 @@ import '../styles/global.css';
           <span class="gpt-slider"></span>
         </label>
       </div>
+      <div class="gpt-input-group">
+        <button class="gpt-action-btn secondary" id="gpt-open-natural-settings" style="flex: 1; font-size: 0.85em;">Customise</button>
+        <select id="gpt-output-language" style="flex: 1.5; font-size: 0.85em;">
+          <option value="">Default (Auto-Detect)</option>
+          <option value="English (UK)">English (UK)</option>
+          <option value="English (US)">English (US)</option>
+          <option value="French">French</option>
+          <option value="Spanish">Spanish</option>
+          <option value="Chinese (Mandarin)">Chinese (Mandarin)</option>
+        </select>
+      </div>
+    </SidebarSection>
+
+    <SidebarSection title="✍️ Prompt Library">
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+        <textarea id="gpt-prompt-input" placeholder="e.g. Translate [Text]..." class="gpt-custom-textarea"></textarea>
+        <button class="gpt-action-btn secondary" id="gpt-save-prompt" style="width: 100%;">Save Prompt</button>
+      </div>
+      <div class="gpt-input-group">
+        <select id="gpt-prompt-select"><option value="">-- Saved Prompts --</option></select>
+        <button class="gpt-action-btn secondary" id="gpt-insert-prompt">Insert</button>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="gpt-action-btn secondary" id="gpt-edit-prompt" style="flex: 1; font-size: 0.8em; padding: 8px;">Edit</button>
+        <button class="gpt-action-btn secondary" id="gpt-rename-prompt" style="flex: 1; font-size: 0.8em; padding: 8px;">Rename</button>
+        <button class="gpt-action-btn secondary" id="gpt-delete-prompt" style="flex: 1; font-size: 0.8em; padding: 8px; color: #ef4444;">Delete</button>
+      </div>
+    </SidebarSection>
+  </TabContent>
+
+  <TabContent id="gpt-tab-set">
+    <SidebarSection title="📄 Export Data">
+      <button class="gpt-action-btn" id="gpt-export-md" style="background: #4a90e2; border: none; color: white;">Export Current Conversation</button>
+    </SidebarSection>
+    <SidebarSection title="💾 Cloud Sync">
+      <div class="gpt-toggle-wrapper">
+        <span class="gpt-toggle-label" style="font-size: 0.9em;">Auto-Sync to Google Drive</span>
+        <label class="gpt-switch">
+          <input type="checkbox" id="gpt-cloud-sync-toggle" />
+          <span class="gpt-slider"></span>
+        </label>
+      </div>
+      <p style="font-size: 0.82em; color: #ef4444; margin-top: 8px;">Warning: Switching this off means data will not be backed up to Drive.</p>
+    </SidebarSection>
+    <SidebarSection title="⏱️ Auto-Backups">
+      <p style="font-size: 0.85em; color: #64748b; margin-bottom: 10px;">Automatically saves a snapshot every 10 mins.</p>
+      <button class="gpt-action-btn secondary" id="gpt-open-auto-backups" style="width:100%; border: 1px solid #a855f7; color: #a855f7; background: transparent;">Launch Time Machine</button>
+    </SidebarSection>
+    <SidebarSection title="⚠️ Danger Zone">
+      <p style="font-size: 0.85em; color: #64748b; margin-bottom: 10px;">Completely wipe all local and cloud data.</p>
+      <button class="gpt-action-btn secondary" id="gpt-factory-reset" style="width:100%; border: 1px solid #ef4444; color: #ef4444; background: transparent;">Factory Reset</button>
     </SidebarSection>
   </TabContent>
 </div>
@@ -43,13 +101,159 @@ import '../styles/global.css';
   import { forceLoadHistory } from '../scripts/historyScanner.js';
   import { saveToCloud, loadFromCloud } from '../scripts/driveSync.js';
 
-  async function initializeWorkspace() {
-      const email = await extractUserEmail();
-      console.log('Gemini Tools initialized safely for account:', email);
-      
-      // Paste your original event listeners and state management initialisation here
+  // Core global settings and extension state matching content.js
+  let activeEmail = 'default@gmail.com';
+  let safeEmailKey = 'default_gmail_com';
+  let STORAGE_KEY = '';
+  let BACKUP_KEY = '';
+
+  let extensionSettings = {
+      sidebarCollapsed: false,
+      outputLanguage: '',
+      naturalResponsesEnabled: false,
+      cloudSyncEnabled: false,
+      onboardingComplete: false,
+      cloudAccountId: null,
+      naturalResponseSettings: {
+          style: 'flowing',
+          noEmDashes: true,
+          noSemicolons: true,
+          noRoboticTransitions: true,
+          noPreambles: true,
+          noPostambles: true
+      },
+      prompts: [],
+      folders: {},
+      pinnedFolders: [],
+      tags: {},
+      tagColors: {},
+      archives: []
+  };
+
+  let activeFilterTag = null;
+  let isDataLoaded = false;
+  let isModifyingDOM = false;
+  let globalHarvestedChats = new Map();
+  let currentActiveTagColor = '#4a90e2';
+  let globalDragPayload = null;
+  let hasAttemptedHistoryLoad = false;
+  let revealedNativeChat = null;
+  let showAllFolders = false; 
+  let openFolders = [];
+  let archiveOpen = false;
+
+  // Initial runtime setup block
+  async function startAstroExtension() {
+      activeEmail = await extractUserEmail();
+      safeEmailKey = activeEmail.replace(/[@.]/g, '_');
+      STORAGE_KEY = `gpt_workspace_settings_${safeEmailKey}`;
+      BACKUP_KEY = `gpt_workspace_backups_${safeEmailKey}`;
+
+      setupLocalStateListeners();
+      bindTabNavigation();
+      initializeSystemHeartbeat();
   }
 
-  // Kick off runtime processing
-  initializeWorkspace();
+  // Binds the tabs inside your compiled Astro UI elements
+  function bindTabNavigation() {
+      const tabs = Array.from(document.querySelectorAll('.gpt-tab-btn'));
+      tabs.forEach(btn => {
+          btn.addEventListener('click', (e) => {
+              const targetBtn = e.target as HTMLButtonElement;
+              const innerTabs = Array.from(document.querySelectorAll('.gpt-tab-btn'));
+              innerTabs.forEach(b => b.classList.remove('active'));
+              
+              const innerContents = Array.from(document.querySelectorAll('.gpt-tab-content'));
+              innerContents.forEach(c => c.classList.remove('active'));
+              
+              targetBtn.classList.add('active');
+              const targetContent = document.getElementById(targetBtn.dataset.target);
+              if (targetContent) targetContent.classList.add('active');
+          });
+      });
+  }
+
+  // State initialization and storage tracking
+  function setupLocalStateListeners() {
+      chrome.storage.local.get([STORAGE_KEY, BACKUP_KEY], (localData) => {
+          let localSettings = localData[STORAGE_KEY] || {};
+          let localBackups = localData[BACKUP_KEY] || [];
+          
+          extensionSettings = { ...extensionSettings, ...localSettings };
+          isDataLoaded = true;
+          
+          // Connect active form controls to state values
+          const naturalToggle = document.getElementById('gpt-natural-toggle') as HTMLInputElement;
+          if (naturalToggle) naturalToggle.checked = extensionSettings.naturalResponsesEnabled;
+
+          const langSelect = document.getElementById('gpt-output-language') as HTMLSelectElement;
+          if (langSelect) langSelect.value = extensionSettings.outputLanguage || '';
+
+          const syncToggle = document.getElementById('gpt-cloud-sync-toggle') as HTMLInputElement;
+          if (syncToggle) syncToggle.checked = extensionSettings.cloudSyncEnabled;
+
+          attachUIControls();
+      });
+  }
+
+  // Form management and interactive button click capture loops
+  function attachUIControls() {
+      const naturalToggle = document.getElementById('gpt-natural-toggle');
+      if (naturalToggle) {
+          naturalToggle.addEventListener('change', (e) => {
+              const target = e.target as HTMLInputElement;
+              extensionSettings.naturalResponsesEnabled = target.checked;
+              saveSettingsState();
+          });
+      }
+
+      const langSelect = document.getElementById('gpt-output-language');
+      if (langSelect) {
+          langSelect.addEventListener('change', (e) => {
+              const target = e.target as HTMLSelectElement;
+              extensionSettings.outputLanguage = target.value;
+              saveSettingsState();
+          });
+      }
+
+      const colorSwatches = Array.from(document.querySelectorAll('.gpt-colour-swatch'));
+      colorSwatches.forEach(swatch => {
+          swatch.addEventListener('click', (e) => {
+              colorSwatches.forEach(s => s.classList.remove('selected'));
+              const target = e.target as HTMLElement;
+              target.classList.add('selected');
+              currentActiveTagColor = target.dataset.colour;
+          });
+      });
+  }
+
+  // Persists current states securely down into storage APIs
+  function saveSettingsState() {
+      if (!isDataLoaded) return;
+      const localSaveObj = {};
+      localSaveObj[STORAGE_KEY] = extensionSettings;
+      chrome.storage.local.set(localSaveObj, () => {
+          if (extensionSettings.cloudSyncEnabled) {
+              saveToCloud({ settings: extensionSettings, backups: [] }, extensionSettings.cloudAccountId, activeEmail);
+          }
+      });
+  }
+
+  // Keeps components alive and monitors background dynamic DOM updates safely
+  function initializeSystemHeartbeat() {
+      setInterval(() => {
+          if (!isDataLoaded || isModifyingDOM) return;
+          // Scans for native chat list element alignments
+          const chatLinks = document.querySelectorAll('a[href*="/app/"], a[href*="/chat/"]');
+          if (chatLinks.length > 0 && !hasAttemptedHistoryLoad) {
+              hasAttemptedHistoryLoad = true;
+              forceLoadHistory(() => {
+                  console.log('Past history segments aggregated securely.');
+              });
+          }
+      }, 2000);
+  }
+
+  // Instantly triggers when extension loads up on gemini.google.com URLs
+  startAstroExtension();
 </script>
