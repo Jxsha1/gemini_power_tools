@@ -1,0 +1,55 @@
+---
+import SidebarSection from '../components/SidebarSection.astro';
+import TabContent from '../components/TabContent.astro';
+import '../styles/global.css';
+---
+
+<div id="gpt-right-sidebar">
+  <div class="gpt-tabs">
+    <button class="gpt-tab-btn active" data-target="gpt-tab-org">Organise</button>
+    <button class="gpt-tab-btn" data-target="gpt-tab-tools">Tools</button>
+    <button class="gpt-tab-btn" data-target="gpt-tab-set">Settings</button>
+  </div>
+
+  <TabContent id="gpt-tab-org" isActive={true}>
+    <SidebarSection title="📦 Bulk Operations">
+      <button class="gpt-action-btn secondary" id="gpt-open-bulk">Launch Bulk Manager</button>
+    </SidebarSection>
+
+    <SidebarSection title="🏷️ Custom Tags">
+      <div class="gpt-input-group">
+        <input type="text" id="gpt-tag-input" placeholder="e.g. #Research" />
+      </div>
+      <button class="gpt-action-btn secondary" id="gpt-save-tag">Create Tag</button>
+      <div id="gpt-tag-list"></div>
+    </SidebarSection>
+  </TabContent>
+
+  <TabContent id="gpt-tab-tools">
+    <SidebarSection title="🤖 Output Settings">
+      <div class="gpt-toggle-wrapper">
+        <span class="gpt-toggle-label">Enable Natural Responses</span>
+        <label class="gpt-switch">
+          <input type="checkbox" id="gpt-natural-toggle" />
+          <span class="gpt-slider"></span>
+        </label>
+      </div>
+    </SidebarSection>
+  </TabContent>
+</div>
+
+<script>
+  import { extractUserEmail } from '../scripts/domScanner.js';
+  import { forceLoadHistory } from '../scripts/historyScanner.js';
+  import { saveToCloud, loadFromCloud } from '../scripts/driveSync.js';
+
+  async function initializeWorkspace() {
+      const email = await extractUserEmail();
+      console.log('Gemini Tools initialized safely for account:', email);
+      
+      // Paste your original event listeners and state management initialisation here
+  }
+
+  // Kick off runtime processing
+  initializeWorkspace();
+</script>
