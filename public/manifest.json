@@ -36,5 +36,16 @@
       ],
       "run_at": "document_idle"
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "sidebar.html",
+        "assets/sidebar.css"
+      ],
+      "matches": [
+        "https://gemini.google.com/*"
+      ]
+    }
   ]
 }
