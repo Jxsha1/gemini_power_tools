@@ -36,8 +36,12 @@ let currentActiveTagColor = '#4a90e2';
 let hasAttemptedHistoryLoad = false;
 
 async function injectSidebarDOM() {
+    // Check if the sidebar already exists to prevent duplicate injections
+    if (document.getElementById('gpt-right-sidebar')) return true;
+
     try {
-        const response = await fetch(chrome.runtime.getURL('sidebar.html'));
+        const sidebarUrl = chrome.runtime.getURL('sidebar.html');
+        const response = await fetch(sidebarUrl);
         const htmlText = await response.text();
         
         const wrapper = document.createElement('div');
@@ -56,24 +60,30 @@ async function injectSidebarDOM() {
 }
 
 async function startRuntimeBridge() {
-    const injected = await injectSidebarDOM();
-    if (!injected) return;
-
+    // Core variable assignments must run first to prevent state blocking
     activeEmail = await extractUserEmail();
     safeEmailKey = activeEmail.replace(/[@.]/g, '_');
     STORAGE_KEY = `gpt_workspace_settings_${safeEmailKey}`;
     BACKUP_KEY = `gpt_workspace_backups_${safeEmailKey}`;
 
-    chrome.storage.local.get([STORAGE_KEY], (localData) => {
+    chrome.storage.local.get([STORAGE_KEY], async (localData) => {
         let localSettings = localData[STORAGE_KEY] || {};
         extensionSettings = { ...extensionSettings, ...localSettings };
         isDataLoaded = true;
         
+        // Initialise core background interactions and page interceptors
         setupInteractions();
-        bindTabNavigation();
-        setupLocalStateListeners();
         initializeSystemHeartbeat();
-        console.log('Gemini Workspace Engine safely bridged via Astro.');
+        
+        // Attempt DOM injection safely without blocking history processes
+        const injected = await injectSidebarDOM();
+        if (injected) {
+            bindTabNavigation();
+            setupLocalStateListeners();
+            console.log('Gemini Workspace Engine UI safely bridged via Astro.');
+        } else {
+            console.warn('UI injection delayed. Extension core runtime is still active.');
+        }
     });
 }
 
@@ -188,6 +198,17 @@ function appendSystemConstraints(inputBox) {
 function initializeSystemHeartbeat() {
     setInterval(() => {
         if (!isDataLoaded || isModifyingDOM) return;
+        
+        // Ensure UI injection is re-verified periodically if first attempt was too early
+        if (!document.getElementById('gpt-right-sidebar')) {
+            injectSidebarDOM().then((success) => {
+                if (success) {
+                    bindTabNavigation();
+                    setupLocalStateListeners();
+                }
+            });
+        }
+
         const chatLinks = document.querySelectorAll('a[href*="/app/"], a[href*="/chat/"]');
         if (chatLinks.length > 0 && !hasAttemptedHistoryLoad) {
             hasAttemptedHistoryLoad = true;
