@@ -35,7 +35,30 @@ let isModifyingDOM = false;
 let currentActiveTagColor = '#4a90e2';
 let hasAttemptedHistoryLoad = false;
 
+async function injectSidebarDOM() {
+    try {
+        const response = await fetch(chrome.runtime.getURL('sidebar.html'));
+        const htmlText = await response.text();
+        
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = htmlText;
+        
+        const sidebarNode = wrapper.querySelector('#gpt-right-sidebar');
+        if (sidebarNode) {
+            document.body.appendChild(sidebarNode);
+            document.body.classList.add('gpt-sidebar-active');
+            return true;
+        }
+    } catch (error) {
+        console.error('Failed to inject Gemini Workspace Tools layout panel:', error);
+    }
+    return false;
+}
+
 async function startRuntimeBridge() {
+    const injected = await injectSidebarDOM();
+    if (!injected) return;
+
     activeEmail = await extractUserEmail();
     safeEmailKey = activeEmail.replace(/[@.]/g, '_');
     STORAGE_KEY = `gpt_workspace_settings_${safeEmailKey}`;
