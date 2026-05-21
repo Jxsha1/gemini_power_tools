@@ -201,6 +201,21 @@ function attachUIControls() {
             currentActiveTagColor = target.dataset.colour;
         });
     });
+
+    const createFolderBtn = document.getElementById('gpt-create-folder');
+    const folderInput = document.getElementById('gpt-new-folder-input');
+    
+    if (createFolderBtn && folderInput) {
+        createFolderBtn.addEventListener('click', () => {
+            const folderName = folderInput.value.trim();
+            if (folderName && !extensionSettings.folders[folderName]) {
+                extensionSettings.folders[folderName] = { chats: [] };
+                folderInput.value = '';
+                saveSettingsState();
+                renderFolders();
+            }
+        });
+    }
 }
 
 function saveSettingsState() {
