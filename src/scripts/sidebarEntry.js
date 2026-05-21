@@ -129,6 +129,39 @@ function setupLocalStateListeners() {
     if (syncToggle) syncToggle.checked = extensionSettings.cloudSyncEnabled;
 
     attachUIControls();
+    renderFolders();
+}
+
+function renderFolders() {
+    const folderList = document.getElementById('gpt-folder-list');
+    if (!folderList) return;
+    
+    folderList.innerHTML = '';
+    const folderNames = Object.keys(extensionSettings.folders || {});
+    
+    if (folderNames.length === 0) {
+        folderList.innerHTML = '<p style="font-size: 0.85em; color: #64748b;">No folders created yet.</p>';
+        return;
+    }
+    
+    folderNames.forEach(folderName => {
+        const folderEl = document.createElement('div');
+        folderEl.style.cssText = 'display: flex; justify-content: space-between; padding: 8px; background: #1e293b; border-radius: 4px; align-items: center;';
+        folderEl.innerHTML = `
+            <span style="font-size: 0.9em; color: #f8fafc;">📁 ${folderName}</span>
+            <button class="gpt-delete-folder" data-folder="${folderName}" style="background: transparent; border: none; color: #ef4444; cursor: pointer;">✕</button>
+        `;
+        folderList.appendChild(folderEl);
+    });
+    
+    document.querySelectorAll('.gpt-delete-folder').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const fname = e.currentTarget.dataset.folder;
+            delete extensionSettings.folders[fname];
+            saveSettingsState();
+            renderFolders();
+        });
+    });
 }
 
 function attachUIControls() {
