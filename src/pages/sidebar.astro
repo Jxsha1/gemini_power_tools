@@ -12,6 +12,14 @@ import '../../src/styles/global.css';
   </div>
 
   <TabContent id="gpt-tab-org" isActive={true}>
+    <SidebarSection title="📁 Folders">
+      <div class="gpt-input-group" style="display: flex; gap: 8px; margin-bottom: 10px;">
+        <input type="text" id="gpt-new-folder-input" placeholder="New folder name..." style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: white;" />
+        <button class="gpt-action-btn secondary" id="gpt-create-folder" style="padding: 8px 12px;">Add</button>
+      </div>
+      <div id="gpt-folder-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+    </SidebarSection>
+
     <SidebarSection title="📦 Bulk Operations">
       <button class="gpt-action-btn secondary" id="gpt-open-bulk">Launch Bulk Manager</button>
     </SidebarSection>
